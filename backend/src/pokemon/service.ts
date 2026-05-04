@@ -1,12 +1,10 @@
 import axios from 'axios';
 import type { BattlePokemon, BattleMove, PokemonPreview } from '../types';
+import { cacheGet, cacheSet } from '../cache/redis';
 
 const pokeApi = axios.create({ baseURL: 'https://pokeapi.co/api/v2', timeout: 15000 });
 
 const LEVEL = 50;
-
-// Cache to avoid re-fetching the same Pokémon across battles
-const cache = new Map<string, BattlePokemon>();
 
 function calcHp(base: number): number {
   return Math.floor((2 * base * LEVEL) / 100) + LEVEL + 10;
@@ -41,14 +39,14 @@ interface PokeApiMove {
 
 /** Full load: stats + top 4 damaging moves. Result is cached. */
 export async function loadBattlePokemon(nameOrId: string | number): Promise<BattlePokemon> {
-  const key = String(nameOrId).toLowerCase();
-  const cached = cache.get(key);
+  const key = `pokemon:${String(nameOrId).toLowerCase()}`;
+
+  const cached = await cacheGet<BattlePokemon>(key);
   if (cached) {
-    // Return a fresh copy at full HP; moves are read-only so shared ref is safe
     return { ...cached, currentHp: cached.maxHp };
   }
 
-  const { data } = await pokeApi.get<PokeApiPokemon>(`/pokemon/${key}`);
+  const { data } = await pokeApi.get<PokeApiPokemon>(`/pokemon/${String(nameOrId).toLowerCase()}`);
   const moves = await fetchMoves(data);
   const stat = (name: string) => data.stats.find(s => s.stat.name === name)?.base_stat ?? 0;
   const hp = calcHp(stat('hp'));
@@ -68,16 +66,15 @@ export async function loadBattlePokemon(nameOrId: string | number): Promise<Batt
     moves,
   };
 
-  cache.set(key, pokemon);
+  await cacheSet(key, pokemon);
   return { ...pokemon, currentHp: pokemon.maxHp };
 }
 
 /** Light load: only stats and sprite, no move fetching. For team building previews. */
 export async function getPokemonPreview(nameOrId: string | number): Promise<PokemonPreview> {
-  const key = String(nameOrId).toLowerCase();
+  const key = `pokemon:${String(nameOrId).toLowerCase()}`;
 
-  // Reuse cached data if available
-  const cached = cache.get(key);
+  const cached = await cacheGet<BattlePokemon>(key);
   if (cached) {
     return {
       name: cached.name,
@@ -95,7 +92,7 @@ export async function getPokemonPreview(nameOrId: string | number): Promise<Poke
     };
   }
 
-  const { data } = await pokeApi.get<PokeApiPokemon>(`/pokemon/${key}`);
+  const { data } = await pokeApi.get<PokeApiPokemon>(`/pokemon/${String(nameOrId).toLowerCase()}`);
   const stat = (name: string) => data.stats.find(s => s.stat.name === name)?.base_stat ?? 0;
 
   return {

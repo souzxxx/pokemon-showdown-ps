@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { battleRouter } from './routes/battle';
 import { pokemonRouter } from './routes/pokemon';
+import { connectRedis } from './cache/redis';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -13,7 +14,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/pokemon', pokemonRouter);
 app.use('/api/battle', battleRouter);
 
-app.listen(PORT, () => {
+connectRedis().then(() => app.listen(PORT, () => {
   console.log(`\nPokemon Battle API → http://localhost:${PORT}\n`);
   console.log('Endpoints:');
   console.log('  GET    /api/pokemon/:name           – prévia de um Pokémon (team builder)');
@@ -21,4 +22,4 @@ app.listen(PORT, () => {
   console.log('  POST   /api/battle/:id/turn         – executar ação    { action, moveIndex | switchTo }');
   console.log('  GET    /api/battle/:id              – estado atual da batalha');
   console.log('  DELETE /api/battle/:id              – encerrar sessão\n');
-});
+}));
