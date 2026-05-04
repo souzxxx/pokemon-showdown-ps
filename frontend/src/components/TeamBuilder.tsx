@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchPokemonPreview } from '../api/battleApi';
 import type { PokemonPreview } from '../types/battle';
 
@@ -15,16 +15,23 @@ const STAT_LABELS: Record<string, string> = {
 };
 
 interface Props {
-  onStart: (team: string[]) => void;
+  onStart: (team: string[]) => Promise<void> | void;
+  onSave: (team: string[]) => Promise<void> | void;
 }
 
-export default function TeamBuilder({ onStart }: Props) {
+export default function TeamBuilder({ onStart, onSave }: Props) {
   const [team, setTeam] = useState<PokemonPreview[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSaved(false);
+  }, [team]);
 
   async function handleAdd() {
     const name = query.trim().toLowerCase();
@@ -48,12 +55,32 @@ export default function TeamBuilder({ onStart }: Props) {
 
   function handleRemove(index: number) {
     setTeam(prev => prev.filter((_, i) => i !== index));
+    setSaved(false);
   }
 
-  function handleStart() {
+  async function handleSave() {
+    if (team.length !== 6) { setError('Você precisa de exatamente 6 Pokémon para salvar.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await onSave(team.map(p => p.name));
+      setSaved(true);
+    } catch (e: any) {
+      setError(e?.message ?? 'Não foi possível salvar o time.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStart() {
     if (team.length !== 6) { setError('Você precisa de exatamente 6 Pokémon.'); return; }
     setStarting(true);
-    onStart(team.map(p => p.name));
+    try {
+      await onStart(team.map(p => p.name));
+    } catch (e: any) {
+      setStarting(false);
+      setError(e?.message ?? 'Não foi possível salvar o time.');
+    }
   }
 
   return (
@@ -128,9 +155,16 @@ export default function TeamBuilder({ onStart }: Props) {
           ))}
         </div>
 
-        {/* Start button */}
+        {/* Save and start buttons */}
         <div className="builder-footer">
           <span className="team-count">{team.length}/6 Pokémon</span>
+          <button
+            className="btn-save"
+            onClick={handleSave}
+            disabled={team.length !== 6 || saving}
+          >
+            {saving ? 'Salvando...' : saved ? 'Time salvo ✓' : 'Salvar time'}
+          </button>
           <button
             className="btn-start"
             onClick={handleStart}
