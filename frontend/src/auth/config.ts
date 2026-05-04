@@ -11,5 +11,5 @@ export const auth0Config: Auth0Config = {
   clientId: import.meta.env.VITE_AUTH0_CLIENT_ID ?? '',
   audience: import.meta.env.VITE_AUTH0_AUDIENCE ?? '',
   redirectUri: import.meta.env.VITE_AUTH0_REDIRECT_URI ?? window.location.origin,
-  usersApiBaseUrl: import.meta.env.VITE_USERS_API_BASE_URL ?? 'http://localhost:8001',
+  usersApiBaseUrl: import.meta.env.VITE_USERS_API_BASE_URL ?? 'http://localhost:8000/api/users',
 };

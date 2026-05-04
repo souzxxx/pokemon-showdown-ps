@@ -5,7 +5,8 @@ import type {
   TurnResponse,
 } from '../types/battle';
 
-const api = axios.create({ baseURL: 'http://localhost:3001/api', timeout: 60000 });
+const baseURL = import.meta.env.VITE_GATEWAY_BASE_URL ?? 'http://localhost:8000/api';
+const api = axios.create({ baseURL, timeout: 60000 });
 
 export async function fetchPokemonPreview(name: string): Promise<PokemonPreview> {
   const { data } = await api.get<PokemonPreview>(`/pokemon/${name.toLowerCase().trim()}`);
