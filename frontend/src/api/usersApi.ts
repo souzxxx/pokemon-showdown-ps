@@ -8,11 +8,21 @@ type TrainerMe = {
   username: string;
 };
 
+type SavedTeam = {
+  id: string;
+  name: string;
+  members: string[];
+};
+
 type SavedTeamResponse = {
   team: {
     id: string;
     name: string;
   };
+};
+
+type SavedTeamsResponse = {
+  teams: SavedTeam[];
 };
 
 const usersApi = axios.create({
@@ -29,9 +39,19 @@ export async function getMe(token: string): Promise<TrainerMe> {
   return data;
 }
 
-export async function saveTeam(token: string, pokemonNames: string[]): Promise<SavedTeamResponse['team']> {
+export async function getSavedTeams(token: string): Promise<SavedTeam[]> {
+  const { data } = await usersApi.get<SavedTeamsResponse>('/me/teams', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data.teams;
+}
+
+export async function saveTeam(token: string, pokemonNames: string[], name?: string): Promise<SavedTeamResponse['team']> {
   const { data } = await usersApi.post<SavedTeamResponse>('/me/teams', {
     pokemonNames,
+    name,
   }, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -39,4 +59,12 @@ export async function saveTeam(token: string, pokemonNames: string[]): Promise<S
   });
 
   return data.team;
+}
+
+export async function deleteTeam(token: string, teamId: string): Promise<void> {
+  await usersApi.delete(`/me/teams/${teamId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 }

@@ -5,8 +5,35 @@ import type {
   TurnResponse,
 } from '../types/battle';
 
-const baseURL = import.meta.env.VITE_GATEWAY_BASE_URL ?? 'http://localhost:8000/api';
+const baseURL = import.meta.env.VITE_GATEWAY_BASE_URL ?? 'http://localhost:3001/api';
 const api = axios.create({ baseURL, timeout: 60000 });
+const pokeApi = axios.create({ baseURL: 'https://pokeapi.co/api/v2', timeout: 15000 });
+
+type PokemonListResponse = {
+  results: Array<{ name: string; url: string }>;
+};
+
+let cachedPokemonNames: string[] | null = null;
+
+async function loadAllPokemonNames(): Promise<string[]> {
+  if (cachedPokemonNames) {
+    return cachedPokemonNames;
+  }
+
+  const { data } = await pokeApi.get<PokemonListResponse>('/pokemon', {
+    params: { limit: 2000 },
+  });
+
+  cachedPokemonNames = data.results.map(result => result.name);
+  return cachedPokemonNames;
+}
+
+export async function getPokemonSuggestions(prefix: string): Promise<string[]> {
+  const trimmed = prefix.toLowerCase().trim();
+  if (!trimmed) return [];
+  const names = await loadAllPokemonNames();
+  return names.filter(name => name.startsWith(trimmed)).slice(0, 12);
+}
 
 export async function fetchPokemonPreview(name: string): Promise<PokemonPreview> {
   const { data } = await api.get<PokemonPreview>(`/pokemon/${name.toLowerCase().trim()}`);

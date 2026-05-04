@@ -18,6 +18,25 @@ function slugify(value?: string): string {
   return slug.length > 0 ? slug : 'trainer';
 }
 
+async function buildUniqueUsername(baseUsername: string, auth0Sub: string): Promise<string> {
+  let candidate = baseUsername;
+  const suffix = auth0Sub.replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase() || 'u';
+  let attempt = 0;
+
+  while (true) {
+    const existingUser = await prisma.user.findUnique({ where: { username: candidate } });
+    if (!existingUser) {
+      return candidate;
+    }
+    if (existingUser.auth0Sub === auth0Sub) {
+      return candidate;
+    }
+
+    attempt += 1;
+    candidate = `${baseUsername}-${suffix}${attempt > 1 ? attempt : ''}`;
+  }
+}
+
 export async function currentUser(req: Request, res: Response, next: NextFunction) {
   const sub = req.auth?.payload?.sub;
   if (!sub) {
@@ -26,7 +45,8 @@ export async function currentUser(req: Request, res: Response, next: NextFunctio
 
   const email = typeof req.auth?.payload?.email === 'string' ? req.auth?.payload?.email : undefined;
   const normalizedEmail = email?.toLowerCase();
-  const username = slugify(normalizedEmail);
+  const baseUsername = slugify(normalizedEmail);
+  const username = await buildUniqueUsername(baseUsername, sub);
 
   const user = await prisma.user.upsert({
     where: { auth0Sub: sub },

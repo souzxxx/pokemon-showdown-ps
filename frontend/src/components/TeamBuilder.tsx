@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { fetchPokemonPreview } from '../api/battleApi';
+import { fetchPokemonPreview, getPokemonSuggestions } from '../api/battleApi';
 import type { PokemonPreview } from '../types/battle';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -14,15 +14,28 @@ const STAT_LABELS: Record<string, string> = {
   hp: 'HP', attack: 'ATK', defense: 'DEF', spAtk: 'SpA', spDef: 'SpD', speed: 'SPD',
 };
 
-interface Props {
-  onStart: (team: string[]) => Promise<void> | void;
-  onSave: (team: string[]) => Promise<void> | void;
+interface SavedTeam {
+  id: string;
+  name: string;
+  members: string[];
 }
 
-export default function TeamBuilder({ onStart, onSave }: Props) {
+interface Props {
+  onStart: (team: string[]) => Promise<void> | void;
+  onSave: (team: string[], name?: string) => Promise<void> | void;
+  onDelete?: (teamId: string) => Promise<void> | void;
+  savedTeams?: SavedTeam[];
+}
+
+export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = [] }: Props) {
   const [team, setTeam] = useState<PokemonPreview[]>([]);
+  const [teamName, setTeamName] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [loadingSavedTeam, setLoadingSavedTeam] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,6 +45,40 @@ export default function TeamBuilder({ onStart, onSave }: Props) {
   useEffect(() => {
     setSaved(false);
   }, [team]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSuggestions = async () => {
+      const prefix = query.trim();
+      if (!prefix) {
+        setSuggestions([]);
+        setActiveSuggestionIndex(-1);
+        return;
+      }
+
+      setSuggestionsLoading(true);
+      try {
+        const names = await getPokemonSuggestions(prefix);
+        if (cancelled) return;
+        const filtered = names.filter(name => !team.some(p => p.name === name));
+        setSuggestions(filtered);
+        setActiveSuggestionIndex(filtered.length > 0 ? 0 : -1);
+      } catch {
+        if (!cancelled) {
+          setSuggestions([]);
+          setActiveSuggestionIndex(-1);
+        }
+      } finally {
+        if (!cancelled) setSuggestionsLoading(false);
+      }
+    };
+
+    loadSuggestions();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, team]);
 
   async function handleAdd() {
     const name = query.trim().toLowerCase();
@@ -45,6 +92,28 @@ export default function TeamBuilder({ onStart, onSave }: Props) {
       const preview = await fetchPokemonPreview(name);
       setTeam(prev => [...prev, preview]);
       setQuery('');
+      setSuggestions([]);
+      setActiveSuggestionIndex(-1);
+      inputRef.current?.focus();
+    } catch (e: any) {
+      setError(e?.response?.data?.error ?? `Pokémon "${name}" não encontrado.`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectSuggestion(name: string) {
+    if (team.length >= 6) { setError('Time completo! Máximo de 6 Pokémon.'); return; }
+    if (team.some(p => p.name === name)) { setError(`${name} já está no time.`); return; }
+
+    setError('');
+    setLoading(true);
+    try {
+      const preview = await fetchPokemonPreview(name);
+      setTeam(prev => [...prev, preview]);
+      setQuery('');
+      setSuggestions([]);
+      setActiveSuggestionIndex(-1);
       inputRef.current?.focus();
     } catch (e: any) {
       setError(e?.response?.data?.error ?? `Pokémon "${name}" não encontrado.`);
@@ -63,12 +132,36 @@ export default function TeamBuilder({ onStart, onSave }: Props) {
     setSaving(true);
     setError('');
     try {
-      await onSave(team.map(p => p.name));
+      await onSave(team.map(p => p.name), teamName.trim() || undefined);
       setSaved(true);
     } catch (e: any) {
       setError(e?.message ?? 'Não foi possível salvar o time.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleLoadSavedTeam(savedTeam: SavedTeam) {
+    if (!savedTeam.members.length) {
+      setError('Este time salvo não contém Pokémon.');
+      return;
+    }
+
+    setError('');
+    setLoadingSavedTeam(savedTeam.id);
+    setSaved(false);
+
+    try {
+      const previews = await Promise.all(
+        savedTeam.members.map(member => fetchPokemonPreview(member)),
+      );
+      setTeam(previews);
+      setTeamName(savedTeam.name);
+      setQuery('');
+    } catch (e: any) {
+      setError(e?.response?.data?.error ?? 'Não foi possível carregar o time salvo.');
+    } finally {
+      setLoadingSavedTeam(null);
     }
   }
 
@@ -97,8 +190,30 @@ export default function TeamBuilder({ onStart, onSave }: Props) {
             ref={inputRef}
             className="search-input"
             value={query}
-            onChange={e => { setQuery(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            onChange={e => {
+              setQuery(e.target.value);
+              setError('');
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
+                  handleSelectSuggestion(suggestions[activeSuggestionIndex]);
+                } else {
+                  handleAdd();
+                }
+              }
+
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActiveSuggestionIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+              }
+
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActiveSuggestionIndex(prev => Math.max(prev - 1, 0));
+              }
+            }}
             placeholder="Nome do Pokémon (ex: charizard)"
             disabled={loading || team.length >= 6}
           />
@@ -112,6 +227,74 @@ export default function TeamBuilder({ onStart, onSave }: Props) {
         </div>
 
         {error && <p className="search-error">{error}</p>}
+
+        {query.trim() ? (
+          <div className="suggestions-panel">
+            {suggestionsLoading ? (
+              <p className="suggestions-loading">Procurando Pokémon...</p>
+            ) : suggestions.length > 0 ? (
+              <ul className="suggestions-list">
+                {suggestions.map((suggestion, index) => (
+                  <li
+                    key={suggestion}
+                    className={`suggestion-item ${index === activeSuggestionIndex ? 'active' : ''}`}
+                    onMouseDown={() => handleSelectSuggestion(suggestion)}
+                  >
+                    {suggestion}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="no-suggestions">Nenhum Pokémon encontrado para "{query}".</p>
+            )}
+          </div>
+        ) : null}
+
+        {savedTeams.length > 0 ? (
+          <section className="saved-teams-block">
+            <h2>Times Salvos</h2>
+            <div className="saved-teams-grid">
+              {savedTeams.map(savedTeam => (
+                <div key={savedTeam.id} className="saved-team-card">
+                  <div className="saved-team-card-header">
+                    <strong>{savedTeam.name}</strong>
+                    <div className="saved-team-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSavedTeam(savedTeam)}
+                        disabled={loadingSavedTeam !== null}
+                      >
+                        {loadingSavedTeam === savedTeam.id ? 'Carregando...' : 'Carregar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="delete-team-btn"
+                        onClick={() => onDelete?.(savedTeam.id)}
+                        disabled={loadingSavedTeam !== null}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                  <div className="saved-team-members">
+                    {savedTeam.members.join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <div className="team-name-row">
+          <label htmlFor="team-name-input">Nome do time:</label>
+          <input
+            id="team-name-input"
+            className="team-name-input"
+            value={teamName}
+            onChange={e => setTeamName(e.target.value)}
+            placeholder="Digite um nome para o time"
+          />
+        </div>
 
         {/* Team slots */}
         <div className="team-slots">

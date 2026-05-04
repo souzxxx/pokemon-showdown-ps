@@ -83,10 +83,12 @@ function TeamBar({
 interface Props {
   playerTeamNames: string[];
   onQuit: () => void;
+  onSaveTeam?: (team: string[], name?: string) => Promise<void>;
 }
 
-export default function BattleArena({ playerTeamNames, onQuit }: Props) {
+export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Props) {
   const [battleId, setBattleId] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState('');
   const [playerTeam, setPlayerTeam] = useState<ApiPokemon[]>([]);
   const [opponentTeam, setOpponentTeam] = useState<ApiPokemon[]>([]);
   const [playerSlots, setPlayerSlots] = useState<TeamSlot[]>([]);
@@ -99,6 +101,8 @@ export default function BattleArena({ playerTeamNames, onQuit }: Props) {
   const [phase, setPhase] = useState<BattlePhase>('choosing');
   const [winner, setWinner] = useState<'player' | 'opponent' | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [loadError, setLoadError] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -173,6 +177,19 @@ export default function BattleArena({ playerTeamNames, onQuit }: Props) {
       setMessages(prev => [...prev, `Erro: ${e?.response?.data?.error ?? 'falha na requisição'}`]);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleSaveTeam() {
+    if (!onSaveTeam) return;
+    setSaving(true);
+    try {
+      await onSaveTeam(playerTeamNames, saveName || undefined);
+      setSaved(true);
+    } catch (e: any) {
+      setMessages(prev => [...prev, `Erro ao salvar time: ${e?.message ?? 'falha'}`]);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -322,7 +339,24 @@ export default function BattleArena({ playerTeamNames, onQuit }: Props) {
             <div className={`winner-banner ${winner === 'player' ? 'winner-player' : 'winner-opponent'}`}>
               {winner === 'player' ? '🏆 Você venceu!' : '💀 Inimigo venceu!'}
             </div>
-            <button className="restart-btn" onClick={onQuit}>Montar novo time</button>
+            <div className="save-name-row">
+              <label htmlFor="battle-save-name">Nome do time (opcional):</label>
+              <input
+                id="battle-save-name"
+                className="save-name-input"
+                value={saveName}
+                onChange={e => setSaveName(e.target.value)}
+                placeholder="Ex: Time Dragão"
+              />
+            </div>
+            <div className="ended-actions">
+              {onSaveTeam ? (
+                <button className="save-btn" onClick={handleSaveTeam} disabled={saving || saved}>
+                  {saving ? 'Salvando...' : saved ? 'Time salvo ✓' : 'Salvar este time'}
+                </button>
+              ) : null}
+              <button className="restart-btn" onClick={onQuit}>Montar novo time</button>
+            </div>
           </div>
         )}
       </div>
