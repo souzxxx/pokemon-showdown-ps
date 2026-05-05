@@ -9,13 +9,17 @@ app.use(cors({ origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-const battleProxy = createProxyMiddleware({
+app.use('/api/pokemon', createProxyMiddleware({
   target: env.BATTLE_SERVICE_URL,
   changeOrigin: true,
-});
+  pathRewrite: { '^/': '/api/pokemon/' },
+}));
 
-app.use('/api/pokemon', battleProxy);
-app.use('/api/battle', battleProxy);
+app.use('/api/battle', createProxyMiddleware({
+  target: env.BATTLE_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: { '^/': '/api/battle/' },
+}));
 
 app.use(
   '/api/users',
