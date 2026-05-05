@@ -2,7 +2,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -55,7 +55,7 @@ services:
         VITE_AUTH0_REDIRECT_URI: ${VITE_AUTH0_REDIRECT_URI}
         VITE_USERS_API_BASE_URL: ${VITE_USERS_API_BASE_URL}
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
       - gateway
 
