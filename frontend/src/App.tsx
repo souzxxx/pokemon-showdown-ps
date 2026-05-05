@@ -141,17 +141,31 @@ export default function App() {
 
   const accountLabel = isAuthenticated
     ? me
-      ? `${me.username}${me.email ? ` · ${me.email}` : ''}`
-      : user?.email ?? 'Logado'
-    : 'Deslogado';
+      ? me.email
+        ? <><span>{me.username}</span><span className="auth-divider">·</span><span>{me.email}</span></>
+        : <span>{me.username}</span>
+      : <span>{user?.email ?? 'Logado'}</span>
+    : <span>Deslogado</span>;
 
   return (
     <div>
       <header className="auth-header">
-        <div>
-          {isLoading ? 'Carregando auth...' : accountLabel}
+        <div className="auth-brand">
+          <svg viewBox="0 0 32 32" fill="none" className="pokeball-icon" aria-hidden="true">
+            <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" />
+            <path d="M2 16h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M18 16h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="16" cy="16" r="4" stroke="currentColor" strokeWidth="2" fill="rgba(7,7,15,0.85)" />
+            <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+          </svg>
+          <span>Trainer</span>
         </div>
-        <div>
+        <div className="auth-status">
+          {isLoading
+            ? <span className="auth-status-loading">Carregando…</span>
+            : accountLabel}
+        </div>
+        <div className="auth-actions">
           {isAuthenticated ? (
             <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
               Sair
@@ -164,10 +178,14 @@ export default function App() {
         </div>
       </header>
 
-      {meLoading ? <p>Carregando /me...</p> : null}
-      {meError ? <p>{meError}</p> : null}
-      {savedTeamsLoading ? <p>Carregando times salvos...</p> : null}
-      {savedTeamsError ? <p>{savedTeamsError}</p> : null}
+      {(meLoading || meError || savedTeamsLoading || savedTeamsError) && (
+        <div className="auth-toasts" aria-live="polite">
+          {meLoading ? <div className="auth-toast auth-toast--info">Carregando perfil…</div> : null}
+          {meError ? <div className="auth-toast auth-toast--error">{meError}</div> : null}
+          {savedTeamsLoading ? <div className="auth-toast auth-toast--info">Carregando times salvos…</div> : null}
+          {savedTeamsError ? <div className="auth-toast auth-toast--error">{savedTeamsError}</div> : null}
+        </div>
+      )}
 
       <TeamBuilder
         onStart={handleStart}

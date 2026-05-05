@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type CSSProperties } from 'react';
 import { fetchPokemonPreview, getPokemonSuggestions } from '../api/battleApi';
 import type { PokemonPreview } from '../types/battle';
 
@@ -9,6 +9,34 @@ const TYPE_COLORS: Record<string, string> = {
   rock: '#B8A038', ghost: '#705898', dragon: '#7038F8', dark: '#705848',
   steel: '#B8B8D0', fairy: '#EE99AC',
 };
+
+function PokeballIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={className} aria-hidden="true">
+      <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" />
+      <path d="M2 16h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M18 16h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="4" stroke="currentColor" strokeWidth="2" fill="rgba(7,7,15,0.85)" />
+      <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function BoltIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M13 2 4 14h6l-2 8 9-12h-6l2-8z" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={className} aria-hidden="true">
+      <path d="M3 3l10 10M13 3L3 13" />
+    </svg>
+  );
+}
 
 const STAT_LABELS: Record<string, string> = {
   hp: 'HP', attack: 'ATK', defense: 'DEF', spAtk: 'SpA', spDef: 'SpD', speed: 'SPD',
@@ -176,10 +204,12 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
     }
   }
 
+  const ready = team.length === 6;
+
   return (
     <div className="builder-screen">
       <div className="builder-header">
-        <h1 className="builder-title">Pokemon Showdown</h1>
+        <h1 className="builder-title">Pokémon Showdown</h1>
         <p className="builder-subtitle">Monte seu time de 6 Pokémon</p>
       </div>
 
@@ -286,7 +316,7 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
         ) : null}
 
         <div className="team-name-row">
-          <label htmlFor="team-name-input">Nome do time:</label>
+          <label htmlFor="team-name-input">Nome do time</label>
           <input
             id="team-name-input"
             className="team-name-input"
@@ -298,62 +328,77 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
 
         {/* Team slots */}
         <div className="team-slots">
-          {team.map((poke, i) => (
-            <div key={poke.name} className="team-card">
-              <button className="remove-btn" onClick={() => handleRemove(i)} title="Remover">✕</button>
-              <img src={poke.spriteUrl} alt={poke.displayName} className="team-sprite" />
-              <div className="team-card-info">
-                <span className="team-poke-name">{poke.displayName}</span>
-                <div className="team-types">
-                  {poke.types.map(t => (
-                    <span key={t} className="type-pill" style={{ background: TYPE_COLORS[t] ?? '#888' }}>
-                      {t.toUpperCase()}
-                    </span>
-                  ))}
-                </div>
-                <div className="team-stats">
-                  {Object.entries(STAT_LABELS).map(([key, label]) => (
-                    <div key={key} className="stat-row">
-                      <span className="stat-label">{label}</span>
-                      <div className="stat-bar-bg">
-                        <div
-                          className="stat-bar-fill"
-                          style={{ width: `${Math.min(100, (poke.stats[key as keyof typeof poke.stats] / 255) * 100)}%` }}
-                        />
+          {team.map((poke, i) => {
+            const primaryType = poke.types[0] ?? 'normal';
+            const cardStyle = {
+              '--type-color': TYPE_COLORS[primaryType] ?? '#888',
+              '--i': i,
+            } as CSSProperties;
+            return (
+              <div key={poke.name} className="team-card" style={cardStyle}>
+                <span className="slot-number">{String(i + 1).padStart(2, '0')}</span>
+                <button className="remove-btn" onClick={() => handleRemove(i)} title="Remover" aria-label="Remover Pokémon">
+                  <CloseIcon />
+                </button>
+                <img src={poke.spriteUrl} alt={poke.displayName} className="team-sprite" />
+                <div className="team-card-info">
+                  <span className="team-poke-name">{poke.displayName}</span>
+                  <div className="team-types">
+                    {poke.types.map(t => (
+                      <span key={t} className="type-pill" style={{ background: TYPE_COLORS[t] ?? '#888' }}>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="team-stats">
+                    {Object.entries(STAT_LABELS).map(([key, label]) => (
+                      <div key={key} className="stat-row">
+                        <span className="stat-label">{label}</span>
+                        <div className="stat-bar-bg">
+                          <div
+                            className="stat-bar-fill"
+                            style={{ width: `${Math.min(100, (poke.stats[key as keyof typeof poke.stats] / 255) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="stat-val">{poke.stats[key as keyof typeof poke.stats]}</span>
                       </div>
-                      <span className="stat-val">{poke.stats[key as keyof typeof poke.stats]}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Empty slots */}
-          {Array.from({ length: 6 - team.length }).map((_, i) => (
-            <div key={`empty-${i}`} className="team-card team-card-empty">
-              <div className="empty-slot-icon">?</div>
-              <span className="empty-slot-text">Slot {team.length + i + 1}</span>
-            </div>
-          ))}
+          {Array.from({ length: 6 - team.length }).map((_, i) => {
+            const slotIdx = team.length + i;
+            const cardStyle = { '--i': slotIdx } as CSSProperties;
+            return (
+              <div key={`empty-${i}`} className="team-card team-card-empty" style={cardStyle}>
+                <PokeballIcon className="empty-pokeball" />
+                <span className="empty-slot-text">Slot {slotIdx + 1}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Save and start buttons */}
         <div className="builder-footer">
-          <span className="team-count">{team.length}/6 Pokémon</span>
+          <span className="team-count">{team.length}/6</span>
           <button
             className="btn-save"
             onClick={handleSave}
             disabled={team.length !== 6 || saving}
           >
-            {saving ? 'Salvando...' : saved ? 'Time salvo ✓' : 'Salvar time'}
+            {saving ? 'Salvando…' : saved ? 'Time salvo ✓' : 'Salvar time'}
           </button>
           <button
-            className="btn-start"
+            className={`btn-start${ready ? ' btn-start--ready' : ''}`}
             onClick={handleStart}
             disabled={team.length !== 6 || starting}
           >
-            {starting ? 'Carregando batalha...' : 'Iniciar Batalha!'}
+            <BoltIcon className="bolt-icon" />
+            {starting ? 'Carregando batalha…' : 'Iniciar Batalha'}
           </button>
         </div>
       </div>
