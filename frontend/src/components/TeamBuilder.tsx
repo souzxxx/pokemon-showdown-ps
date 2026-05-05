@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, type CSSProperties } from 'react';
+import { useEffect, useState, useRef, startTransition, type CSSProperties } from 'react';
+import axios from 'axios';
 import { fetchPokemonPreview, getPokemonSuggestions } from '../api/battleApi';
 import type { PokemonPreview } from '../types/battle';
 
@@ -71,7 +72,7 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setSaved(false);
+    startTransition(() => setSaved(false));
   }, [team]);
 
   useEffect(() => {
@@ -123,8 +124,8 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
       setSuggestions([]);
       setActiveSuggestionIndex(-1);
       inputRef.current?.focus();
-    } catch (e: any) {
-      setError(e?.response?.data?.error ?? `Pokémon "${name}" não encontrado.`);
+    } catch (e) {
+      setError(axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : `Pokémon "${name}" não encontrado.`);
     } finally {
       setLoading(false);
     }
@@ -143,8 +144,8 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
       setSuggestions([]);
       setActiveSuggestionIndex(-1);
       inputRef.current?.focus();
-    } catch (e: any) {
-      setError(e?.response?.data?.error ?? `Pokémon "${name}" não encontrado.`);
+    } catch (e) {
+      setError(axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : `Pokémon "${name}" não encontrado.`);
     } finally {
       setLoading(false);
     }
@@ -162,8 +163,8 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
     try {
       await onSave(team.map(p => p.name), teamName.trim() || undefined);
       setSaved(true);
-    } catch (e: any) {
-      setError(e?.message ?? 'Não foi possível salvar o time.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível salvar o time.');
     } finally {
       setSaving(false);
     }
@@ -186,8 +187,8 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
       setTeam(previews);
       setTeamName(savedTeam.name);
       setQuery('');
-    } catch (e: any) {
-      setError(e?.response?.data?.error ?? 'Não foi possível carregar o time salvo.');
+    } catch (e) {
+      setError(axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : 'Não foi possível carregar o time salvo.');
     } finally {
       setLoadingSavedTeam(null);
     }
@@ -198,9 +199,9 @@ export default function TeamBuilder({ onStart, onSave, onDelete, savedTeams = []
     setStarting(true);
     try {
       await onStart(team.map(p => p.name));
-    } catch (e: any) {
+    } catch (e) {
       setStarting(false);
-      setError(e?.message ?? 'Não foi possível salvar o time.');
+      setError(e instanceof Error ? e.message : 'Não foi possível iniciar a batalha.');
     }
   }
 

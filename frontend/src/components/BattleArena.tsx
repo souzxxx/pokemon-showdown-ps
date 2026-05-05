@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { startBattle, sendMove, sendSwitch } from '../api/battleApi';
 import type { ApiPokemon, ApiMove, TeamSlot, BattlePhase } from '../types/battle';
 
@@ -110,6 +111,7 @@ export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Pro
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { init(); }, []);
 
   async function init() {
@@ -135,8 +137,8 @@ export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Pro
       setMessages(resp.messages);
       setPhase(resp.phase);
       setWinner(null);
-    } catch (e: any) {
-      setLoadError(e?.response?.data?.error ?? 'Erro ao conectar com o servidor de batalha.');
+    } catch (e) {
+      setLoadError(axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : 'Erro ao conectar com o servidor de batalha.');
     } finally {
       setBusy(false);
     }
@@ -160,8 +162,8 @@ export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Pro
     try {
       const resp = await sendMove(battleId, moveIndex);
       applyTurnResponse(resp);
-    } catch (e: any) {
-      setMessages(prev => [...prev, `Erro: ${e?.response?.data?.error ?? 'falha na requisição'}`]);
+    } catch (e) {
+      setMessages(prev => [...prev, `Erro: ${axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : 'falha na requisição'}`]);
     } finally {
       setBusy(false);
     }
@@ -173,8 +175,8 @@ export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Pro
     try {
       const resp = await sendSwitch(battleId, switchTo);
       applyTurnResponse(resp);
-    } catch (e: any) {
-      setMessages(prev => [...prev, `Erro: ${e?.response?.data?.error ?? 'falha na requisição'}`]);
+    } catch (e) {
+      setMessages(prev => [...prev, `Erro: ${axios.isAxiosError(e) ? e.response?.data?.error ?? e.message : 'falha na requisição'}`]);
     } finally {
       setBusy(false);
     }
@@ -186,8 +188,8 @@ export default function BattleArena({ playerTeamNames, onQuit, onSaveTeam }: Pro
     try {
       await onSaveTeam(playerTeamNames, saveName || undefined);
       setSaved(true);
-    } catch (e: any) {
-      setMessages(prev => [...prev, `Erro ao salvar time: ${e?.message ?? 'falha'}`]);
+    } catch (e) {
+      setMessages(prev => [...prev, `Erro ao salvar time: ${e instanceof Error ? e.message : 'falha'}`]);
     } finally {
       setSaving(false);
     }

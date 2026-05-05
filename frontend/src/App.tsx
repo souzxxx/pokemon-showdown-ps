@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, startTransition } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import TeamBuilder from './components/TeamBuilder';
 import BattleArena from './components/BattleArena';
@@ -55,7 +55,7 @@ export default function App() {
     try {
       const teams = await getSavedTeams(token);
       setSavedTeams(teams);
-    } catch (err: any) {
+    } catch (err) {
       setSavedTeamsError(axios.isAxiosError(err)
         ? err.response?.data?.error ?? err.message
         : 'Falha ao carregar times salvos.');
@@ -87,13 +87,15 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setMe(null);
-      setSavedTeams([]);
+      startTransition(() => {
+        setMe(null);
+        setSavedTeams([]);
+      });
       return;
     }
 
     if (!auth0Config.audience) {
-      setMeError('Configure VITE_AUTH0_AUDIENCE no frontend/.env');
+      startTransition(() => setMeError('Configure VITE_AUTH0_AUDIENCE no frontend/.env'));
       return;
     }
 
